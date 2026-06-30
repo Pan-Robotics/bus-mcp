@@ -15,7 +15,32 @@ retune bitrate / baud / SPI mode mid-session. Point Claude at a Pi and
 it can talk to a sensor, dump CAN traffic, or wiggle a pin without you
 writing a Python script first.
 
-## Install
+![bus-mcp architecture](docs/architecture.png)
+
+## Quick install on a Pi
+
+```bash
+git clone https://github.com/Pan-Robotics/bus-mcp.git
+cd bus-mcp
+./packaging/install.sh --allow-write
+```
+
+That's it. The installer:
+
+- creates `~/.local/share/bus-mcp/.venv` with `--system-site-packages`
+  so apt-packaged `lgpio` / `pyserial` / `smbus2` / `spidev` are reused
+  (no SWIG rebuild)
+- installs `mcp` + `python-can` + `bus-mcp` itself
+- adds you to `spi` / `i2c` / `gpio` / `dialout` groups
+- installs `/etc/systemd/system/bus-mcp.service` and enables it
+- prints the MCP endpoint URL + the `claude mcp add` line for your host
+
+It does **not** touch `/boot/firmware/config.txt` (CAN HAT overlays vary
+by HAT variant), pick a CAN bitrate, or open firewall ports.
+
+Re-running is idempotent. To remove everything: `./packaging/install.sh --uninstall`.
+
+## Manual install (PyPI, no systemd)
 
 On a Pi:
 
@@ -69,17 +94,19 @@ Edit `~/.config/Claude/claude_desktop_config.json`:
 
 ## Wire into Claude Code
 
-stdio:
+stdio (Claude Code on the same Pi):
 
 ```bash
 claude mcp add bus-mcp -- bus-mcp serve --allow-write
 ```
 
-HTTP (Pi reachable on `pi.local:7820`):
+HTTP (Pi reachable on `pi.local:7820`, or substitute your hostname / IP):
 
 ```bash
 claude mcp add --transport http bus-mcp http://pi.local:7820/mcp
 ```
+
+The installer prints the exact URL for your host at the end of its run.
 
 ## Tools the agent gets
 
@@ -106,7 +133,10 @@ claude mcp add --transport http bus-mcp http://pi.local:7820/mcp
 
 `*_configure` tools take all fields as optional kwargs — pass only what
 you want to change. The bus is closed immediately so the next call
-reopens it with the new config.
+reopens it with the new config. Blocking receive tools (`can_receive`,
+`serial_receive`, `i2c_scan`) run on a worker thread via
+`asyncio.to_thread`, so a single client can hold a long receive open
+while firing other tool calls in parallel.
 
 ## Safety
 
@@ -123,27 +153,31 @@ kill switch.
 ## Verifying on a Pi — Waveshare 2-CH CAN HAT loopback
 
 The [Waveshare 2-CH CAN HAT][wsh] gives you two MCP2515 channels exposed
-as `can0` + `can1`. With both channels wired into each other, frames
-sent on one channel land on the other — a perfect end-to-end test.
+as `can0` + `can1`. With both channels wired into each other
+(CAN_H ↔ CAN_H, CAN_L ↔ CAN_L, **plus the on-board 120 Ω termination
+jumpers enabled on both sides**), frames sent on one channel land on
+the other — a perfect end-to-end test.
 
 [wsh]: https://www.waveshare.com/2-ch-can-hat.htm
 
 ```bash
-# 1. Enable SPI + the overlays (one-time)
+# 1. Enable SPI + the overlays (one-time).
+#    These values are for the ORIGINAL 2-CH CAN HAT (16 MHz crystals,
+#    IRQs on GPIO 23 + 25). The HAT+ variant uses different pins —
+#    check your HAT before pasting.
 sudo raspi-config nonint do_spi 0
 sudo tee -a /boot/firmware/config.txt <<'EOF'
-dtoverlay=mcp2515-can0,oscillator=12000000,interrupt=25
-dtoverlay=mcp2515-can1,oscillator=12000000,interrupt=24
+dtoverlay=mcp2515-can0,oscillator=16000000,interrupt=23
+dtoverlay=mcp2515-can1,oscillator=16000000,interrupt=25
 EOF
 sudo reboot
 
-# 2. After reboot — bring both interfaces up
+# 2. After reboot — bring both interfaces up.
 sudo ip link set can0 up type can bitrate 500000
 sudo ip link set can1 up type can bitrate 500000
 
-# 3. Install + launch bus-mcp on HTTP
-pip install "bus-mcp[pi-all]"
-bus-mcp serve --transport http --allow-write &
+# 3. Install bus-mcp and start it.
+./packaging/install.sh --allow-write    # or: bus-mcp serve --transport http --allow-write &
 
 # 4. From an agent (or curl directly), exercise the loopback:
 #    - on can0: can_send {arbitration_id=0x123, data_hex="deadbeef"}
@@ -151,13 +185,43 @@ bus-mcp serve --transport http --allow-write &
 #    expect: one frame with arbitration_id=0x123, data="deadbeef"
 ```
 
-A raw curl smoke-test (initialize the MCP session):
+A raw curl smoke-test (initialize the MCP session) — substitute your Pi's
+hostname / IP for `<HOST>`:
 
 ```bash
 curl -i -X POST -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
   --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"0.0.1"}}}' \
-  http://127.0.0.1:7820/mcp
+  http://<HOST>:7820/mcp
+```
+
+If the controllers settle into `ERROR-PASSIVE` instead of `ERROR-ACTIVE`
+(`ip -details link show can0`), the on-board termination jumpers
+probably aren't enabled. Either turn them on or drop the bitrate to
+something the bus can sustain (`sudo ip link set can0 down; sudo ip
+link set can0 type can bitrate 250000; sudo ip link set can0 up`).
+
+## Architecture
+
+See [`docs/architecture.png`](docs/architecture.png) for the full
+layered view, or re-render after editing:
+
+```bash
+python docs/render_arch.py    # writes docs/architecture.png
+```
+
+The render script (`docs/render_arch.py`) uses pure-PIL — no `dot` /
+`mmdc` / browser engines — and auto-sizes each layer band from its
+tallest box, so adding tools or drivers doesn't require manual layout
+tuning.
+
+## Logs + service control (systemd install only)
+
+```bash
+sudo systemctl status bus-mcp           # is it up?
+sudo systemctl restart bus-mcp          # bounce it
+sudo journalctl -u bus-mcp -f           # tail logs
+sudo journalctl -u bus-mcp --since=-1h  # past hour
 ```
 
 ## Roadmap
@@ -165,6 +229,7 @@ curl -i -X POST -H 'Content-Type: application/json' \
 - mDNS advertise so a roaming agent on the LAN can find the Pi
 - Auth on the HTTP endpoint (shared secret header)
 - Filter expressions on `can_receive` beyond single-id+mask
+- PyPI publish (today: install from source)
 
 ## License
 

@@ -1,6 +1,6 @@
 [Unit]
 Description=bus-mcp — MCP server exposing Raspberry Pi peripheral buses to AI agents
-Documentation=https://github.com/alexdada555/bus-mcp
+Documentation=https://github.com/Pan-Robotics/bus-mcp
 After=network-online.target
 Wants=network-online.target
 
