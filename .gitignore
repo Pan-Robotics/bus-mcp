@@ -26,3 +26,6 @@ env/
 *.swp
 *.swo
 .DS_Store
+
+# Marketing copy — kept locally, never published
+docs/linkedin_post.md

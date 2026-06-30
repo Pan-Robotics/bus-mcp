@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>bus-mcp — AI agents that touch silicon</title>
+  <meta name="description"
+        content="An MCP server that exposes a Raspberry Pi's CAN / RS485 / UART / I2C / SPI / GPIO buses as tools for an AI agent." />
+
+  <!-- Open Graph — used by LinkedIn, Slack, Discord, Facebook, etc. -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Pan Robotics" />
+  <meta property="og:title" content="bus-mcp — AI agents that touch silicon" />
+  <meta property="og:description"
+        content="A Model Context Protocol server that runs on a Raspberry Pi and exposes CAN, RS485, UART, I2C, SPI, and GPIO as tools an AI agent can call directly. Open-source, MIT." />
+  <meta property="og:url" content="https://pan-robotics.github.io/bus-mcp/" />
+  <meta property="og:image" content="https://pan-robotics.github.io/bus-mcp/linkedin_card.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="627" />
+  <meta property="og:image:alt"
+        content="Diagram: AI agent → MCP → bus-mcp on a Raspberry Pi → CAN, RS485, I2C, SPI, GPIO → the machine." />
+
+  <!-- Twitter / X — degrades gracefully on services that prefer it. -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="bus-mcp — AI agents that touch silicon" />
+  <meta name="twitter:description"
+        content="MCP server exposing a Raspberry Pi's hardware buses to AI agents. Open-source, MIT." />
+  <meta name="twitter:image" content="https://pan-robotics.github.io/bus-mcp/linkedin_card.png" />
+
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231e2840'/%3E%3Ctext x='50' y='66' text-anchor='middle' font-family='monospace' font-size='52' font-weight='700' fill='%23e89846'%3E%2F%3C/text%3E%3C/svg%3E" />
+
+  <style>
+    :root {
+      --navy: #1e2840;
+      --navy-deep: #161e32;
+      --paper: #f7f8fc;
+      --ink: #1c202c;
+      --ink-dim: #60687a;
+      --accent: #e89846;
+      --wire: #3c60a8;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      line-height: 1.55;
+    }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 48px 24px 96px;
+    }
+    .accent-strip { height: 6px; background: var(--accent); }
+    .brand {
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      color: var(--ink-dim);
+      margin: 0 0 12px;
+    }
+    h1 {
+      font-size: clamp(40px, 7vw, 72px);
+      margin: 0;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+    }
+    .tagline {
+      font-size: clamp(18px, 2.4vw, 24px);
+      color: var(--ink-dim);
+      margin: 12px 0 32px;
+    }
+    .tagline strong { color: var(--accent); font-weight: 700; }
+    .card-img {
+      display: block;
+      width: 100%;
+      height: auto;
+      margin: 32px 0;
+      border-radius: 14px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 24px 0 40px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-weight: 600;
+      text-decoration: none;
+      font-size: 16px;
+    }
+    .btn-primary { background: var(--navy); color: #fff; }
+    .btn-primary:hover { background: var(--navy-deep); }
+    .btn-secondary {
+      background: transparent;
+      color: var(--ink);
+      border: 1.5px solid var(--ink-dim);
+    }
+    .btn-secondary:hover { border-color: var(--ink); }
+    h2 {
+      font-size: 22px;
+      margin: 32px 0 12px;
+      color: var(--ink);
+    }
+    p, li { color: #303744; font-size: 17px; }
+    ul { padding-left: 22px; }
+    code, pre {
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 14px;
+    }
+    code { background: #eceef4; padding: 2px 6px; border-radius: 4px; }
+    pre {
+      background: #1e2333;
+      color: #e7eaf2;
+      padding: 18px 20px;
+      border-radius: 10px;
+      overflow-x: auto;
+    }
+    footer {
+      margin-top: 64px;
+      padding-top: 24px;
+      border-top: 1px solid #e1e4ea;
+      color: var(--ink-dim);
+      font-size: 14px;
+    }
+    footer a { color: var(--ink-dim); }
+  </style>
+</head>
+<body>
+  <div class="accent-strip"></div>
+  <main>
+    <p class="brand">PAN ROBOTICS</p>
+    <h1>bus-mcp</h1>
+    <p class="tagline">AI agents that <strong>touch silicon.</strong></p>
+
+    <p>
+      A Model Context Protocol server that runs on a Raspberry Pi (or any Linux SBC)
+      and exposes the platform's actual hardware buses — <strong>CAN, RS485, UART,
+      I2C, SPI, GPIO</strong> — as tools an AI agent can call directly. Same protocol
+      your coding assistant uses to read source files; pointed at silicon instead.
+    </p>
+
+    <img src="linkedin_card.png" alt="bus-mcp architecture: agent → MCP → bus-mcp on Pi → buses → machine" class="card-img" />
+
+    <div class="buttons">
+      <a class="btn btn-primary" href="https://github.com/Pan-Robotics/bus-mcp">View on GitHub →</a>
+      <a class="btn btn-secondary" href="https://github.com/Pan-Robotics/bus-mcp#readme">Read the docs</a>
+      <a class="btn btn-secondary" href="architecture.png">Full architecture diagram</a>
+    </div>
+
+    <h2>What it unlocks</h2>
+    <ul>
+      <li><strong>Motor drives you talk to in plain English.</strong> The agent inside the box reads error counters, retunes the bitrate, replays a move — no scope, no test fixture.</li>
+      <li><strong>PID loops tuned by symptom.</strong> The agent reads encoders over RS485, walks Kp / Ki up and down, captures the response.</li>
+      <li><strong>Drones, AGVs, and ROVs that report their own diagnostics</strong> in plain language because the agent has live access to every protocol on board.</li>
+      <li><strong>Companion robots</strong> where the LLM talking to the human is the same one driving the limbs.</li>
+    </ul>
+
+    <h2>Install on a Pi</h2>
+    <pre>git clone https://github.com/Pan-Robotics/bus-mcp.git
+cd bus-mcp
+./packaging/install.sh --allow-write</pre>
+
+    <p>
+      Runs on Pi 4 / 5 / CM4 / CM5 today. MIT licensed. Idempotent installer wires
+      <code>bus-mcp.service</code> on the Pi and prints the <code>claude mcp add</code>
+      line for your hostname.
+    </p>
+
+    <footer>
+      © Pan Robotics ·
+      <a href="https://github.com/Pan-Robotics/bus-mcp">github.com/Pan-Robotics/bus-mcp</a>
+      · MIT
+    </footer>
+  </main>
+</body>
+</html>
