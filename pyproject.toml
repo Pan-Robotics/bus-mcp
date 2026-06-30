@@ -1,0 +1,57 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bus-mcp"
+version = "0.1.0"
+description = "MCP server that exposes a Raspberry Pi's peripheral buses (CAN, RS485/UART, I2C, SPI, GPIO) to AI agents."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "Alexander Dada" }]
+keywords = ["mcp", "raspberry-pi", "can-bus", "rs485", "uart", "i2c", "spi", "gpio", "llm", "agent"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Hardware",
+    "Topic :: System :: Hardware :: Hardware Drivers",
+]
+
+dependencies = [
+    "mcp>=1.0",
+]
+
+[project.optional-dependencies]
+can     = ["python-can>=4.3"]
+serial  = ["pyserial>=3.5"]
+i2c     = ["smbus2>=0.4"]
+spi     = ["spidev>=3.6"]
+gpio    = ["lgpio>=0.2"]
+pi-all  = ["python-can>=4.3", "pyserial>=3.5", "smbus2>=0.4", "spidev>=3.6", "lgpio>=0.2"]
+dev     = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.6"]
+
+[project.scripts]
+bus-mcp = "bus_mcp.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/alexdada555/bus-mcp"
+Issues   = "https://github.com/alexdada555/bus-mcp/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bus_mcp"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+extend-select = ["I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]

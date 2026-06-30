@@ -1,0 +1,27 @@
+[Unit]
+Description=bus-mcp — MCP server exposing Raspberry Pi peripheral buses to AI agents
+Documentation=https://github.com/alexdada555/bus-mcp
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+Group=@GROUP@
+ExecStart=@VENV_BIN@/bus-mcp serve --transport http --host @HOST@ --port @PORT@ @ALLOW_WRITE@
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bus-mcp
+
+# Loose hardening — the user still needs raw access to /dev/spidev*,
+# /dev/i2c-*, /dev/gpiochip*, /dev/ttyS* and AF_CAN sockets, so we only
+# lock down what we can without breaking the hardware reach.
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=read-only
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
